@@ -64,19 +64,20 @@ int assertCacheOk(TrRouting::Calculator *calculator) {
     return 0;
 }
 
-int benchmarkCurrentParams(TrRouting::Calculator *calculator) {
+long long benchmarkCurrentParams(TrRouting::Calculator *calculator) {
+
     int nbIter = 10;
-    double results[nbIter];
+    long long results[nbIter];
     for (int i = 0; i < nbIter; i++) {
-        double start = get_time();
+        long long start = get_time();
         calculator->alternativesRouting();
-        double end = get_time();
+        long long end = get_time();
         results[i] = end - start;
     }
     std::cout << "results: ";
-    double resultSum = 0;
+    long long resultSum = 0;
     for (int i = 0; i < nbIter; i++) {
-        std::cout << results[i];
+        std::cout << results[i] << " ";
         resultSum += results[i];
     }
     std::cout << std::endl;
@@ -87,11 +88,13 @@ int main(int argc, char** argv) {
 
     TrRouting::Parameters algorithmParams;
 
+    // TODO Make that configurable on command line
     algorithmParams.projectShortname       = "mon_test";
     algorithmParams.cacheDirectoryPath     = "./";
     algorithmParams.osrmWalkingPort        = "5000";
     algorithmParams.osrmWalkingHost        = "http://localhost";
     algorithmParams.serverDebugDisplay     = false;
+    algorithmParams.dataFetcherShortname = "cache";
 
     TrRouting::CacheFetcher cacheFetcher    = TrRouting::CacheFetcher();
     algorithmParams.cacheFetcher = &cacheFetcher;
@@ -99,6 +102,9 @@ int main(int argc, char** argv) {
     TrRouting::Calculator calculator(algorithmParams);
     std::cout << "preparing calculator..." << std::endl;
     int dataStatus = calculator.prepare();
+    if (dataStatus < 0) {
+      std::cout << "Something went wrong " << dataStatus << std::endl;
+    }
 
     if (assertCacheOk(&calculator) != 0) {
         std::cout << "Invalid cache" << std::endl;
@@ -106,7 +112,12 @@ int main(int argc, char** argv) {
     }
 
     calculator.params.setDefaultValues();
-    double result = benchmarkCurrentParams(&calculator);
+    // TODO Shouldn't need to do this, but we do for now, those benchmarks are not the same as those in this program though. Here we loop and have microseconds precision.
+    calculator.algorithmCalculationTime.start();
+    calculator.benchmarking.clear();
+
+    // TODO Set the params for each calculation to make. See transit_routing_http_server.cpp, line 327+ for an example calculation call
+    long long result = benchmarkCurrentParams(&calculator);
     std::cout << "Average timing: " << result << std::endl;
 
     return 0;
