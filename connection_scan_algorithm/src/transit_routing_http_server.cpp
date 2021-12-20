@@ -63,6 +63,45 @@ std::string intializeResponse(Calculator::DataStatus status)
   }
 }
 
+std::string intializeResponseNew(Calculator::DataStatus status)
+{
+  switch(status)
+  {
+    case Calculator::DataStatus::READY: return "";
+    case Calculator::DataStatus::DATA_READ_ERROR: return "{\"status\": \"data_error\", \"errorCode\": \"DATA_ERROR\"}";
+    case Calculator::DataStatus::NO_AGENCIES:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_AGENCIES\"}";
+    case Calculator::DataStatus::NO_LINES:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_LINES\"}";
+    case Calculator::DataStatus::NO_NODES:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_NODES\"}";
+    case Calculator::DataStatus::NO_PATHS:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_PATHS\"}";
+    case Calculator::DataStatus::NO_SCENARIOS:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_SCENARIOS\"}";
+    case Calculator::DataStatus::NO_SCHEDULES:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_SCHEDULES\"}";
+    case Calculator::DataStatus::NO_SERVICES:
+      return "{\"status\": \"data_error\", \"errorCode\": \"MISSING_DATA_SERVICES\"}";
+    default: return "PARAM_ERROR_UNKNOWN";
+  }
+}
+
+std::string getResponseCode(ParameterException::Type type)
+{
+  switch(type)
+  {
+    case ParameterException::Type::EMPTY_SCENARIO: return "EMPTY_SCENARIO";
+    case ParameterException::Type::MISSING_SCENARIO: return "MISSING_PARAM_SCENARIO";
+    case ParameterException::Type::MISSING_ORIGIN: return "MISSING_PARAM_ORIGIN";
+    case ParameterException::Type::MISSING_DESTINATION: return "MISSING_PARAM_DESTINATION";
+    case ParameterException::Type::MISSING_TIME_OF_TRIP: return "MISSING_PARAM_TIME_OF_TRIP";
+    case ParameterException::Type::INVALID_ORIGIN: return "INVALID_ORIGIN";
+    case ParameterException::Type::INVALID_DESTINATION: return "INVALID_DESTINATION";
+    case ParameterException::Type::INVALID_NUMERICAL_DATA: return "INVALID_NUMERICAL_DATA";
+    default: return "PARAM_ERROR_UNKNOWN";
+  }
+}
 
 int main(int argc, char** argv) {
 
@@ -429,6 +468,70 @@ int main(int argc, char** argv) {
     }
 
     *serverResponse << "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " << response.length() << "\r\n\r\n" << response;
+
+  };
+
+  // Routing request for a single origin destination
+  server.resource["^/v1/routeOD[/]?$"]["GET"]=[&server, &calculator, &dataStatus](std::shared_ptr<HttpServer::Response> serverResponse, std::shared_ptr<HttpServer::Request> request) {
+
+    std::string response = intializeResponseNew(dataStatus);
+
+    if (!response.empty()) {
+      *serverResponse << "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/" << calculator.params.responseFormat << "; charset=utf-8\r\nContent-Length: " << response.length() << "\r\n\r\n" << response;
+      return;
+    }
+
+    // prepare benchmarking and timer:
+    // TODO Shouldn't have to do this, a query is not a benchmark
+    calculator.algorithmCalculationTime.start();
+    calculator.benchmarking.clear();
+
+    // prepare parameters:
+    std::vector<std::pair<std::string, std::string>> parametersWithValues;
+    auto queryFields = request->parse_query_string();
+    for(auto &field : queryFields)
+    {
+      parametersWithValues.push_back(std::make_pair(field.first, field.second));
+    }
+
+    // clear and initialize benchmarking:
+    if (calculator.params.debugDisplay)
+    {
+      calculator.benchmarking["reset"]               = 0;
+      calculator.benchmarking["forward_calculation"] = 0;
+      //calculator.benchmarking["forward_journey"]     = 0;
+      calculator.benchmarking["reverse_calculation"] = 0;
+      //calculator.benchmarking["reverse_journey"]     = 0;
+      //calculator.benchmarking["generating_results"]  = 0;
+    }
+
+    std::cout << "calculating request: " << request->path << std::endl;
+
+    // update params:
+    try
+    {
+      RouteParameters queryParams = createRouteODParameter(parametersWithValues, calculator.scenarioIndexesByUuid, calculator.scenarios);
+
+      if (queryParams.isAlternatives())
+      {
+        response = calculator.alternativesRouting(queryParams);
+      }
+      else
+      {
+        response = calculator.calculate(queryParams).json.dump(2);
+      }
+
+      std::cerr << "-- total -- " << calculator.algorithmCalculationTime.getDurationMicrosecondsNoStop() << " microseconds\n";
+
+      *serverResponse << "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/" << calculator.params.responseFormat << "; charset=utf-8\r\nContent-Length: " << response.length() << "\r\n\r\n" << response;
+
+    }
+    catch (ParameterException exp)
+    {
+      response = "{\"status\": \"query_error\", \"errorCode\": \"" + getResponseCode(exp.getType()) + "\"}";
+      *serverResponse << "HTTP/1.1 400 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/" << calculator.params.responseFormat << "; charset=utf-8\r\nContent-Length: " << response.length() << "\r\n\r\n" << response;
+      return;
+    }
 
   };
 
