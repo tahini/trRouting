@@ -2,7 +2,7 @@
 
 namespace TrRouting
 {
-  
+
   std::vector<int> Calculator::optimizeJourney(std::deque<std::tuple<int,int,int,int,int,short,int>> &journey)
   {
 
@@ -21,7 +21,7 @@ namespace TrRouting
 
     while(!startedOptimization || optimizationCase >= 0)
     {
-      
+
       startedOptimization     = true;
       optimizationCase        = -1;
       int journeyStepsCount   = journey.size();
@@ -33,7 +33,7 @@ namespace TrRouting
       std::vector<int>              firstNodeIdxByJourneyStepIdx(journeyStepsCount, -1); // first node of each journey segment (boarding node)
       std::vector<int>              lastNodeIdxByJourneyStepIdx(journeyStepsCount, -1); // last node of each journey segment (unboarding node)
       std::vector<std::vector<int>> inBetweenNodesIdxByJourneyStepIdx(journeyStepsCount, std::vector<int>()); // all nodes between boarding and unboarding excluded for each journey segment
-      
+
       for (auto & journeyStep : journey)
       {
         // parse only in-vehicle journey steps:
@@ -60,10 +60,10 @@ namespace TrRouting
               inBetweenNodesIdxByJourneyStepIdx[journeyStepIdx].push_back( std::get<connectionIndexes::NODE_DEP>(*(forwardConnections[ trips[tripIdx]->forwardConnectionsIdx[sequenceIdx] ])) );
             }
           }
-          
+
           for (int i = 0; i < journeyStepIdx; i++)
           {
-            
+
             std::vector<int>::iterator commonNodeI;
 
             // Search for CSL (1): Cut superfluous line:
@@ -79,7 +79,7 @@ namespace TrRouting
                 break;
               }
             }
-            
+
 
             // Search for BTS (2): Boarded too soon:
             if (optimizationCase == -1 && inBetweenNodesIdxByJourneyStepIdx[journeyStepIdx].size() > 0)
@@ -160,7 +160,7 @@ namespace TrRouting
         for(int sequenceIdx = trips[tripIdx]->reverseConnectionsIdx.size() - 1 - sequenceEndIdx; sequenceIdx <= trips[tripIdx]->reverseConnectionsIdx.size() - 1 - sequenceStartIdx; ++sequenceIdx)
         {
           int connectionIdx = trips[tripIdx]->reverseConnectionsIdx[sequenceIdx];
-          
+
           if (optimizationNodeIdx == std::get<connectionIndexes::NODE_ARR>(*(reverseConnections[connectionIdx])))
           {
             if (std::get<connectionIndexes::CAN_UNBOARD>(*(reverseConnections[connectionIdx])) != 1)
@@ -225,7 +225,7 @@ namespace TrRouting
         for(int sequenceIdx = trips[tripIdx]->reverseConnectionsIdx.size() - 1 - sequenceEndIdx; sequenceIdx <= trips[tripIdx]->reverseConnectionsIdx.size() - 1 - sequenceStartIdx; ++sequenceIdx)
         {
           int connectionIdx = trips[tripIdx]->reverseConnectionsIdx[sequenceIdx];
-          
+
           if (optimizationNodeIdx == std::get<connectionIndexes::NODE_ARR>(*(reverseConnections[connectionIdx])))
           {
             if (std::get<connectionIndexes::CAN_UNBOARD>(*(reverseConnections[connectionIdx])) != 1)
