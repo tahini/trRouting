@@ -412,24 +412,24 @@ int main(int argc, char** argv) {
         std::cout << "dts " << calculator.odTrip->departureTimeSeconds << std::endl;
         if (routeParams.isWithAlternatives())
         {
-          response = calculator.alternativesRouting(routeParams);
+          calculator.alternativesRouting(routeParams);
         }
         else
         {
-          response = calculator.calculate(routeParams).json.dump(2);
+          calculator.calculate(routeParams);
         }
       }
       else if (routeParams.isWithAlternatives())
       {
-        response = calculator.alternativesRouting(routeParams);
+        calculator.alternativesRouting(routeParams);
       }
       else if (!routeParams.isWithAlternatives() && (calculator.params.calculateAllOdTrips || foundOdTrip ))
       {
-        response = calculator.odTripsRouting(routeParams);
+        calculator.odTripsRouting(routeParams);
       }
       else
       {
-        response = calculator.calculate(routeParams).json.dump(2);
+        calculator.calculate(routeParams);
       }
 
       if (calculator.params.saveResultToFile)
@@ -514,11 +514,11 @@ int main(int argc, char** argv) {
 
       if (queryParams.isAlternatives())
       {
-        response = calculator.alternativesRouting(queryParams);
+        calculator.alternativesRouting(queryParams);
       }
       else
       {
-        response = calculator.calculate(queryParams).json.dump(2);
+        calculator.calculate(queryParams);
       }
 
       std::cerr << "-- total -- " << calculator.algorithmCalculationTime.getDurationMicrosecondsNoStop() << " microseconds\n";
