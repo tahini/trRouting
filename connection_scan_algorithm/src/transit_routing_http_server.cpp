@@ -26,6 +26,8 @@
 #include "scenario.hpp"
 #include "calculator.hpp"
 #include "program_options.hpp"
+#include "result_to_response.hpp"
+#include "result_to_v1.hpp"
 
 using namespace TrRouting;
 
@@ -325,6 +327,9 @@ int main(int argc, char** argv) {
       calculator.algorithmCalculationTime.start();
       calculator.benchmarking.clear();
 
+      std::unique_ptr<TrRouting::RoutingResultNew> routingResult;
+      TrRouting::AlternativesResult alternativeResult;
+
       // prepare parameters:
       std::vector<std::string> parametersWithValues;
       auto queryFields = request->parse_query_string();
@@ -347,7 +352,7 @@ int main(int argc, char** argv) {
       std::cout << "calculating request: " << request->path << std::endl;
 
       int countOdTripsCalculated {0};
-
+      ResultToV1Response resultConverter = ResultToV1Response();
 
       // update params:
       calculator.params.setDefaultValues();
@@ -365,61 +370,72 @@ int main(int argc, char** argv) {
 
       calculator.odTrip      = nullptr;
 
-      if (calculator.params.odTripUuid.has_value() && calculator.odTripIndexesByUuid.count(calculator.params.odTripUuid.value()))
-      {
-        calculator.odTrip = calculator.odTrips[calculator.odTripIndexesByUuid[calculator.params.odTripUuid.value()]].get();
-        foundOdTrip = true;
-        std::cout << "od trip uuid " << calculator.odTrip->uuid << std::endl;
-        std::cout << "dts " << calculator.odTrip->departureTimeSeconds << std::endl;
-        if (routeParams.isWithAlternatives())
+      try {
+
+        if (calculator.params.odTripUuid.has_value() && calculator.odTripIndexesByUuid.count(calculator.params.odTripUuid.value()))
         {
-          response = calculator.alternativesRouting(routeParams);
+          calculator.odTrip = calculator.odTrips[calculator.odTripIndexesByUuid[calculator.params.odTripUuid.value()]].get();
+          foundOdTrip = true;
+          std::cout << "od trip uuid " << calculator.odTrip->uuid << std::endl;
+          std::cout << "dts " << calculator.odTrip->departureTimeSeconds << std::endl;
+          if (routeParams.isWithAlternatives())
+          {
+            alternativeResult = calculator.alternativesRouting(routeParams);
+            response = resultConverter.resultToJsonString(alternativeResult, routeParams).dump(2);
+          }
+          else
+          {
+            routingResult = calculator.calculate(routeParams);
+          }
+        }
+        else if (routeParams.isWithAlternatives())
+        {
+          alternativeResult = calculator.alternativesRouting(routeParams);
+          response = resultConverter.resultToJsonString(alternativeResult, routeParams).dump(2);
+        }
+        else if (!routeParams.isWithAlternatives() && (calculator.params.calculateAllOdTrips || foundOdTrip ))
+        {
+          response = calculator.odTripsRouting(routeParams);
         }
         else
         {
-          response = calculator.calculate(routeParams).json.dump(2);
+          routingResult = calculator.calculate(routeParams);
         }
-      }
-      else if (routeParams.isWithAlternatives())
-      {
-        response = calculator.alternativesRouting(routeParams);
-      }
-      else if (!routeParams.isWithAlternatives() && (calculator.params.calculateAllOdTrips || foundOdTrip ))
-      {
-        response = calculator.odTripsRouting(routeParams);
-      }
-      else
-      {
-        response = calculator.calculate(routeParams).json.dump(2);
-      }
 
-      if (calculator.params.saveResultToFile)
-      {
-        std::cerr << "writing file" << std::endl;
-        std::ofstream file;
-        //file.imbue(std::locale("en_US.UTF8"));
-        file.open(calculator.params.calculationName + ".json", std::ios_base::trunc);
-        file << response;
-        file.close();
-      }
+        if (routingResult.get() != nullptr) {
+          response = resultConverter.resultToJsonString(*routingResult.get(), routeParams).dump(2);
+        }
 
-      std::cerr << "-- total -- " << calculator.algorithmCalculationTime.getDurationMicrosecondsNoStop() << " microseconds\n";
-
-      if (calculator.params.debugDisplay)
-      {
-        for (auto & benchmark : calculator.benchmarking)
+        if (calculator.params.saveResultToFile)
         {
-          std::cerr << "  -- " << benchmark.first << " -- " << benchmark.second / 1000 << " ms ";
+          std::cerr << "writing file" << std::endl;
+          std::ofstream file;
+          //file.imbue(std::locale("en_US.UTF8"));
+          file.open(calculator.params.calculationName + ".json", std::ios_base::trunc);
+          file << response;
+          file.close();
+        }
+
+        std::cerr << "-- total -- " << calculator.algorithmCalculationTime.getDurationMicrosecondsNoStop() << " microseconds\n";
+
+        if (calculator.params.debugDisplay)
+        {
+          for (auto & benchmark : calculator.benchmarking)
+          {
+            std::cerr << "  -- " << benchmark.first << " -- " << benchmark.second / 1000 << " ms ";
+            if (countOdTripsCalculated > 0)
+            {
+              std::cerr << " (" << (benchmark.second / countOdTripsCalculated / 1000) << " per odTrip)";
+            }
+            std::cerr << "\n";
+          }
           if (countOdTripsCalculated > 0)
           {
-            std::cerr << " (" << (benchmark.second / countOdTripsCalculated / 1000) << " per odTrip)";
+            std::cerr << "  -- number of od trips calculated -- " << countOdTripsCalculated << "\n";
           }
-          std::cerr << "\n";
         }
-        if (countOdTripsCalculated > 0)
-        {
-          std::cerr << "  -- number of od trips calculated -- " << countOdTripsCalculated << "\n";
-        }
+      } catch (NoRoutingFoundException e) {
+          response = resultConverter.noRoutingFoundResponse(routeParams).dump(2);
       }
 
     }
