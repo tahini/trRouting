@@ -13,7 +13,7 @@ namespace TrRouting
    */
   class ResultToResponse {
   public:
-    virtual nlohmann::json resultToJsonString(RoutingResultNew& result, RouteParameters& params) = 0;
+    virtual nlohmann::json resultToJsonString(RoutingResult& result, RouteParameters& params) = 0;
     virtual nlohmann::json noRoutingFoundResponse(RouteParameters& params) = 0;
   };
 

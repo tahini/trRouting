@@ -47,11 +47,11 @@ namespace TrRouting
     return networks.size();
   }
 
-  std::unique_ptr<RoutingResultNew> Calculator::calculate(RouteParameters &parameters, bool resetAccessPaths, bool resetFilters) {
+  std::unique_ptr<RoutingResult> Calculator::calculate(RouteParameters &parameters, bool resetAccessPaths, bool resetFilters) {
 
     reset(parameters, resetAccessPaths, resetFilters);
 
-    std::unique_ptr<RoutingResultNew> result;
+    std::unique_ptr<RoutingResult> result;
     
     std::tuple<int,int,int> forwardResult;
     std::tuple<int,int,int> reverseResult;
